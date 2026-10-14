@@ -1,3 +1,4 @@
+mod history;
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use tauri::Emitter;
@@ -218,6 +219,7 @@ pub fn run(){
  .plugin(tauri_plugin_dialog::init())
  .plugin(tauri_plugin_fs::init())
  .manage(ScanState(Arc::new(AtomicBool::new(false))))
- .invoke_handler(tauri::generate_handler![scan_paths,scan_bytes,cancel_scan,export_csv,export_csv_text])
+ .invoke_handler(tauri::generate_handler![scan_paths,scan_bytes,cancel_scan,export_csv,export_csv_text,
+  history::list_scan_history,history::load_scan_history,history::save_scan_history,history::delete_scan_history])
  .run(tauri::generate_context!()).expect("DocInspector startup failed");
 }
