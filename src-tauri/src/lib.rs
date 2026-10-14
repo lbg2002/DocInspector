@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{fs, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use walkdir::WalkDir;
 use calamine::{open_workbook_auto, Reader};
 use quick_xml::{Reader as XmlReader, events::Event};
@@ -9,16 +9,16 @@ use std::io::Read;
 #[derive(Clone, Deserialize)]
 #[serde(rename_all="camelCase")]
 struct Rule { word:String, kind:String, enabled:bool }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 struct Hit { word:String, kind:String, location:String, context:String }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 struct FileResult { path:String, status:String, hits:Vec<Hit>, missing:Vec<String>, error:Option<String> }
 #[derive(Clone, Serialize)]
 #[serde(rename_all="camelCase")]
 struct Progress { scanned:usize, total:usize, current:String }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 struct Report { files:Vec<FileResult>, total:usize, scanned:usize, cancelled:bool }
 
@@ -110,11 +110,13 @@ fn inspect(path:&Path,rules:&[Rule])->FileResult {
   Ok(segments)=>{
    let mut hits=Vec::new();
    let mut missing=Vec::new();
+   let mut has_forbidden=false;
    for r in rules.iter().filter(|r|r.enabled && !r.word.trim().is_empty()) {
     let mut found=false;
     for s in &segments {
      for (idx,_) in s.text.match_indices(&r.word) {
       found=true;
+      if r.kind=="forbidden" {has_forbidden=true;}
       if hits.len()>=3000 {continue}
       let mut from=idx.saturating_sub(64);
       while !s.text.is_char_boundary(from) {from+=1}
@@ -125,7 +127,7 @@ fn inspect(path:&Path,rules:&[Rule])->FileResult {
     }
     if r.kind=="required" && !found {missing.push(r.word.clone());}
    }
-   let issue=!missing.is_empty() || hits.iter().any(|h|h.kind=="forbidden");
+   let issue=!missing.is_empty() || has_forbidden;
    FileResult{path:name,status:if issue{"issue"}else{"passed"}.into(),hits,missing,error:None}
   }
  }

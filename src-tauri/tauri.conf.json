@@ -30,6 +30,8 @@
       "deb",
       "appimage"
     ],
-    "icon": []
+    "icon": [
+      "icons/icon.png"
+    ]
   }
 }
