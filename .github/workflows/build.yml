@@ -51,3 +51,46 @@ jobs:
           name: DocInspector-Windows-Installer
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
+  release:
+    name: Publish GitHub Release
+    needs: [linux, windows]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: DocInspector-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish installers and checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping."
+            exit 0
+          fi
+          shopt -s nullglob
+          installers=(release-assets/*.deb release-assets/*.exe)
+          if [[ "${#installers[@]}" -ne 2 ]]; then
+            echo "::error::Expected both Ubuntu .deb and Windows .exe"
+            find release-assets -type f
+            exit 1
+          fi
+          (
+            cd release-assets
+            sha256sum -- *.deb *.exe > SHA256SUMS.txt
+          )
+          gh release create "$TAG" "${installers[@]}" release-assets/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "DocInspector $TAG · Lightweight Desktop Release" \
+            --notes-file docs/RELEASE_NOTES_v0.3.1.md \
+            --latest

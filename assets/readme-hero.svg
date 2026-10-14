@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="500" viewBox="0 0 1200 500" role="img" aria-label="DocInspector 界面概念图">
+<defs><linearGradient id="b" x2="1" y2="1"><stop stop-color="#101827"/><stop offset=".6" stop-color="#172942"/><stop offset="1" stop-color="#121824"/></linearGradient><linearGradient id="v"><stop stop-color="#9ac3ff"/><stop offset="1" stop-color="#b0a6ff"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#030913" flood-opacity=".4"/></filter></defs>
+<rect width="1200" height="500" rx="22" fill="url(#b)"/><circle cx="1060" cy="-50" r="290" fill="#6478eb" opacity=".065"/><circle cx="-90" cy="510" r="235" fill="#448cc9" opacity=".07"/>
+<g font-family="Inter,Noto Sans CJK SC,Microsoft YaHei,Arial,sans-serif">
+<rect x="54" y="56" width="55" height="55" rx="16" fill="#293e61" stroke="#6687ba"/>
+<circle cx="78" cy="80" r="11" stroke="#b7ceff" stroke-width="4" fill="none"/><path d="m87 89 10 10" stroke="#b7ceff" stroke-linecap="round" stroke-width="4"/>
+<text x="124" y="96" font-size="29" font-weight="700" fill="#eef4ff">DocInspector</text>
+<text x="56" y="184" font-size="40" font-weight="700" fill="#f5f8ff">让每一个关键词</text>
+<text x="56" y="239" font-size="40" font-weight="700" fill="url(#v)">都有迹可循。</text>
+<text x="57" y="292" font-size="18" fill="#b9cbe3">本地检索 · 规则检查 · 历史留存</text>
+<text x="57" y="323" font-size="16" fill="#88a0be">Rust 驱动 · 离线优先 · 文件只读</text>
+<rect x="57" y="376" width="141" height="41" rx="20" fill="#254460" stroke="#4b749a"/><text x="77" y="402" font-size="14" fill="#dcefff">● Ubuntu · deb</text>
+<rect x="211" y="376" width="155" height="41" rx="20" fill="#283d59" stroke="#4c658a"/><text x="230" y="402" font-size="14" fill="#dcefff">● Windows · exe</text>
+<rect x="379" y="376" width="132" height="41" rx="20" fill="#343151" stroke="#625d91"/><text x="397" y="402" font-size="14" fill="#e3dfff">● Android 预览</text>
+<g transform="translate(552 50)" filter="url(#s)">
+<rect width="607" height="407" rx="15" fill="#121b28" stroke="#6681aa"/>
+<rect width="607" height="41" rx="15" fill="#263449"/><rect y="32" width="607" height="10" fill="#263449"/>
+<circle cx="20" cy="20" r="4" fill="#e98991"/><circle cx="36" cy="20" r="4" fill="#eac07b"/><circle cx="52" cy="20" r="4" fill="#90caac"/>
+<text x="266" y="26" fill="#c2d3ec" font-size="12" font-weight="700">DocInspector</text>
+<rect y="41" width="146" height="366" fill="#172333"/><path d="M146 41V407" stroke="#42536b"/>
+<text x="16" y="76" fill="#92a5c3" font-size="12">检查方案</text>
+<rect x="8" y="90" width="130" height="37" rx="8" fill="#304969"/><circle cx="24" cy="108" r="4" fill="#b1a4ff"/>
+<text x="35" y="113" fill="#edf3ff" font-size="12">论文终稿检查</text>
+<circle cx="24" cy="150" r="4" fill="#82b6e0"/><text x="35" y="155" fill="#b9cde6" font-size="12">敏感信息排查</text>
+<circle cx="24" cy="189" r="4" fill="#82b6e0"/><text x="35" y="194" fill="#b9cde6" font-size="12">代码质量检查</text>
+<text x="170" y="85" fill="#ecf3ff" font-size="20" font-weight="700">论文终稿检查</text>
+<text x="539" y="85" fill="#b4cafa" font-size="19">✎</text>
+<rect x="169" y="110" width="190" height="76" rx="12" fill="#223348" stroke="#415c80"/><rect x="186" y="129" width="39" height="39" rx="10" fill="#39557d"/><path d="M194 140h10l6 6h8v11h-24z" stroke="#b5d0ff" stroke-width="2" fill="none"/>
+<text x="237" y="157" font-size="14" font-weight="700" fill="#e6efff">选择文件夹</text>
+<rect x="374" y="110" width="210" height="76" rx="12" fill="#223348" stroke="#415c80"/><rect x="391" y="129" width="39" height="39" rx="10" fill="#39557d"/><path d="M400 137h19l4 5v18h-23z" stroke="#b5d0ff" stroke-width="2" fill="none"/>
+<text x="443" y="157" font-size="14" font-weight="700" fill="#e6efff">选择文件</text>
+<rect x="169" y="199" width="290" height="39" rx="9" fill="#1d2b40" stroke="#455b7a"/><text x="184" y="224" font-size="12" fill="#93aac8">⌕  临时搜索关键词…</text>
+<rect x="469" y="199" width="115" height="39" rx="9" fill="#99b9f3"/><text x="486" y="224" font-size="13" font-weight="700" fill="#12223b">开始扫描 →</text>
+<text x="170" y="273" font-size="15" font-weight="700" fill="#edf4ff">扫描历史</text>
+<rect x="169" y="290" width="415" height="49" rx="10" fill="#21334a" stroke="#3b5576"/>
+<text x="185" y="309" font-size="13" fill="#e6f0ff">论文资料/</text><text x="185" y="326" font-size="10" fill="#9eb3d1">128 个文件 · 2026/10/14</text>
+<rect x="486" y="301" width="86" height="22" rx="11" fill="#593645"/><text x="504" y="316" font-size="10" fill="#ffc4d0">3 个问题</text>
+<rect x="169" y="348" width="415" height="42" rx="10" fill="#1c2a3d" stroke="#384e6c"/>
+<text x="185" y="373" font-size="13" fill="#d2e2f6">会议论文.docx</text><text x="505" y="373" font-size="12" fill="#a4e2bd">已通过 ✓</text>
+</g>
+<text x="1159" y="483" font-size="11" text-anchor="end" fill="#7794b6">界面布局示意 · 非软件实际截图</text>
+</g></svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="950" height="176" viewBox="0 0 950 176" role="img" aria-label="扫描工作流程图">
+<rect width="950" height="176" rx="17" fill="#141f30"/><g font-family="Noto Sans CJK SC,Arial,sans-serif">
+<g fill="#263a54" stroke="#4e6d97"><rect x="20" y="31" width="206" height="113" rx="13"/><rect x="255" y="31" width="206" height="113" rx="13"/><rect x="490" y="31" width="206" height="113" rx="13"/><rect x="725" y="31" width="205" height="113" rx="13" fill="#264447" stroke="#4d8c82"/></g>
+<g font-size="17" font-weight="700" fill="#eaf2ff"><text x="39" y="73">① 选择方案</text><text x="274" y="73">② 选择文件</text><text x="509" y="73">③ Rust 扫描</text><text x="744" y="73">④ 查看结果</text></g>
+<g font-size="12.5" fill="#b4c9e4"><text x="39" y="109">禁止词 / 必需词 / 搜索</text><text x="274" y="109">文件夹递归 / 多文件</text><text x="509" y="109">多词匹配 / 并发处理</text><text x="744" y="109">高亮证据 / CSV 导出</text></g>
+<g stroke="#8caedf" stroke-width="2" stroke-linecap="round" fill="none"><path d="M232 88h17m-8-6 8 6-8 6"/><path d="M467 88h17m-8-6 8 6-8 6"/><path d="M702 88h17m-8-6 8 6-8 6"/></g></g></svg>
