@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{fs, io::Write, path::{Path, PathBuf}, sync::{Arc, atomic::{AtomicBool, Ordering}}};
 use tauri::Emitter;
 use walkdir::WalkDir;
 use calamine::{open_workbook_auto, Reader};
@@ -78,7 +78,7 @@ fn extract(path:&Path)->Result<Vec<Segment>,String> {
    }
    Ok(out)
   }
-  "txt"|"md"|"csv"|"log"|"json"|"xml"|"html"|"htm"|"rs"|"py"|"js"|"ts"|"tsx"|"jsx"|"c"|"cpp"|"h"|"java"|"toml"|"yaml"|"yml"|"ini"|"sh" => {
+  "txt"|"md"|"csv"|"log"|"json"|"xml"|"html"|"htm"|"rs"|"py"|"js"|"ts"|"tsx"|"jsx"|"c"|"cpp"|"h"|"java"|"toml"|"yaml"|"yml"|"ini"|"sh"|"cc"|"hpp"|"go"|"sql"|"css"|"scss"|"bash"|"zsh"|"kt"|"vue"|"svelte"|"php"|"rb"|"tex"|"bib"|"ipynb"|"mjs"|"cjs"|"jsonl" => {
    let bytes=fs::read(path).map_err(|e|e.to_string())?;
    let text=String::from_utf8(bytes).map_err(|_|"文本不是 UTF-8 编码".to_string())?;
    Ok(text.lines().enumerate().map(|(i,s)| Segment{location:format!("第 {} 行",i+1),text:s.to_owned()}).collect())
@@ -88,7 +88,7 @@ fn extract(path:&Path)->Result<Vec<Segment>,String> {
 }
 fn supported(path:&Path)->bool {
  let ext=path.extension().and_then(|x|x.to_str()).unwrap_or("").to_lowercase();
- matches!(ext.as_str(),"pdf"|"docx"|"pptx"|"xlsx"|"xls"|"ods"|"txt"|"md"|"csv"|"log"|"json"|"xml"|"html"|"htm"|"rs"|"py"|"js"|"ts"|"tsx"|"jsx"|"c"|"cpp"|"h"|"java"|"toml"|"yaml"|"yml"|"ini"|"sh")
+ matches!(ext.as_str(),"pdf"|"docx"|"pptx"|"xlsx"|"xls"|"ods"|"txt"|"md"|"csv"|"log"|"json"|"xml"|"html"|"htm"|"rs"|"py"|"js"|"ts"|"tsx"|"jsx"|"c"|"cpp"|"h"|"java"|"toml"|"yaml"|"yml"|"ini"|"sh"|"cc"|"hpp"|"go"|"sql"|"css"|"scss"|"bash"|"zsh"|"kt"|"vue"|"svelte"|"php"|"rb"|"tex"|"bib"|"ipynb"|"mjs"|"cjs"|"jsonl")
 }
 fn collect(paths:&[String])->Vec<PathBuf> {
  let mut all=std::collections::BTreeSet::new();
@@ -132,6 +132,44 @@ fn inspect(path:&Path,rules:&[Rule])->FileResult {
   }
  }
 }
+fn classify_bytes(name: &str, bytes: &[u8]) -> Result<String,String> {
+ let ext = std::path::Path::new(name).extension().and_then(|x|x.to_str()).unwrap_or("").to_lowercase();
+ if supported(std::path::Path::new(name)) { return Ok(ext) }
+ if bytes.starts_with(b"%PDF-") { return Ok("pdf".into()) }
+ if bytes.starts_with(b"PK\x03\x04") {
+  let reader=std::io::Cursor::new(bytes);
+  if let Ok(mut archive)=zip::ZipArchive::new(reader) {
+   if archive.by_name("word/document.xml").is_ok() { return Ok("docx".into()) }
+   if archive.by_name("ppt/presentation.xml").is_ok() { return Ok("pptx".into()) }
+   if archive.by_name("xl/workbook.xml").is_ok() { return Ok("xlsx".into()) }
+  }
+  return Err("不支持的 ZIP 文档格式".into())
+ }
+ if std::str::from_utf8(bytes).is_ok() { return Ok("txt".into()) }
+ Err("无法识别文档格式".into())
+}
+
+#[tauri::command]
+async fn scan_bytes(name: String, bytes: Vec<u8>, rules: Vec<Rule>) -> Result<FileResult,String> {
+ if bytes.len()>24*1024*1024 {return Ok(FileResult{path:name,status:"unreadable".into(),hits:vec![],missing:vec![],error:Some("文件超过 24MB 移动端限制".into())})}
+ tauri::async_runtime::spawn_blocking(move || {
+  let suffix=match classify_bytes(&name,&bytes) {
+   Ok(ext)=>format!(".{ext}"),
+   Err(e)=>return FileResult{path:name,status:"unreadable".into(),hits:vec![],missing:vec![],error:Some(e)}
+  };
+  let mut temp=match tempfile::Builder::new().prefix("docinspector-").suffix(&suffix).tempfile() {
+   Ok(t)=>t,
+   Err(e)=>return FileResult{path:name,status:"unreadable".into(),hits:vec![],missing:vec![],error:Some(e.to_string())}
+  };
+  if let Err(e)=temp.write_all(&bytes) {
+   return FileResult{path:name,status:"unreadable".into(),hits:vec![],missing:vec![],error:Some(e.to_string())}
+  }
+  let mut report=inspect(temp.path(),&rules);
+  report.path=name;
+  report
+ }).await.map_err(|e|e.to_string())
+}
+
 #[tauri::command]
 fn cancel_scan(state:tauri::State<'_,ScanState>){state.0.store(true,Ordering::SeqCst);}
 #[tauri::command]
@@ -151,6 +189,19 @@ async fn scan_paths(app:tauri::AppHandle, state:tauri::State<'_,ScanState>, path
  }).await.map_err(|e|e.to_string())
 }
 #[tauri::command]
+fn export_csv_text(report:Report)->Result<String,String> {
+ let mut writer=csv::Writer::from_writer(Vec::new());
+ writer.write_record(["文件","状态","规则","关键词","位置","原文","错误"]).map_err(|e|e.to_string())?;
+ for f in report.files {
+  if f.hits.is_empty() && f.missing.is_empty() {writer.write_record([f.path.as_str(),f.status.as_str(),"","","","",f.error.as_deref().unwrap_or("")]).map_err(|e|e.to_string())?;}
+  for h in f.hits { writer.write_record([f.path.as_str(),f.status.as_str(),h.kind.as_str(),h.word.as_str(),h.location.as_str(),h.context.as_str(),""]).map_err(|e|e.to_string())?; }
+  for missing in f.missing {writer.write_record([f.path.as_str(),"issue","required",missing.as_str(),"","缺失",""]).map_err(|e|e.to_string())?;}
+ }
+ let data=writer.into_inner().map_err(|e|e.to_string())?;
+ String::from_utf8(data).map_err(|e|e.to_string())
+}
+
+#[tauri::command]
 fn export_csv(path:String, report:Report)->Result<(),String> {
  let mut w=csv::Writer::from_path(path).map_err(|e|e.to_string())?;
  w.write_record(["文件","状态","规则","关键词","位置","原文","错误"]).map_err(|e|e.to_string())?;
@@ -161,10 +212,12 @@ fn export_csv(path:String, report:Report)->Result<(),String> {
  }
  w.flush().map_err(|e|e.to_string())
 }
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(){
  tauri::Builder::default()
  .plugin(tauri_plugin_dialog::init())
+ .plugin(tauri_plugin_fs::init())
  .manage(ScanState(Arc::new(AtomicBool::new(false))))
- .invoke_handler(tauri::generate_handler![scan_paths,cancel_scan,export_csv])
+ .invoke_handler(tauri::generate_handler![scan_paths,scan_bytes,cancel_scan,export_csv,export_csv_text])
  .run(tauri::generate_context!()).expect("DocInspector startup failed");
 }

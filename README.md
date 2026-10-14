@@ -1,53 +1,42 @@
-# DocInspector
+# DocInspector v0.2
 
-Rust-powered local document search and inspection for Ubuntu.
+基于 Tauri 2 + Rust 的本地文档和代码关键词检索检查器：Ubuntu、Windows、Android 共用 Rust 核心。
 
-**桌面文档与代码全文检索 + 自定义检查方案**。支持递归扫描文件夹，也可以选取单个或多个文件。默认本地处理，不修改输入文件。
+## 工作流程
 
-## 功能
+选择文件或文件夹 → 选择自定义方案 → 扫描 → 查看结果 → CSV 导出。支持禁止词、必需词、检索词，自定义方案可通过 JSON 剪贴板导出和导入。
 
-- 首页管理自定义方案：命名、复制、编辑和删除。
-- 搜索词（定位文本）、禁止词（命中即报问题）、必需词（缺失则报问题）。
-- 支持选择文件夹递归或多个独立文件；显示扫描进度，允许取消。
-- 结果按通过、问题、未检查筛选，展示文本上下文与定位信息。
-- 导出 CSV，记录任务历史（不自动储存文档正文）。
-- 支持 **Python (.py)、Rust (.rs)、JavaScript/TypeScript、Shell、C/C++、Java、JSON、TOML、YAML、HTML、Markdown、TXT、LOG、CSV** 等 UTF-8 文本格式，给出**行号**。
-- 支持 **PDF**（页码）、**DOCX/PPTX**（XML 部件）、**XLSX/XLS/ODS**（工作表与行列）。
-- 不支持扫描图片文字 OCR。对于无法解析的文件显示“未检查”，不会冒充检查通过。
+文件覆盖 PDF、DOCX、PPTX、XLS/XLSX/ODS、TXT、MD、CSV、LOG，以及 Python、Rust、JavaScript、TypeScript、C/C++、Java、Go、SQL、Shell、JSON、TOML、YAML 等常见代码文件。普通代码与文本按行定位。
 
-## Linux 开发环境
+## GitHub Actions 构建产物
 
-需要 Node.js 22+、Rust stable，以及 Tauri 2 的 Linux WebKitGTK 4.1 依赖。
+- Desktop Build → linux → DocInspector-Ubuntu-DEB（小体积 .deb，Ubuntu 24.04+）
+- Desktop Build → windows → DocInspector-Windows-Installer（Windows 10/11 NSIS .exe）
+- Android APK (Preview) → DocInspector-Android-APK-Preview（调试签名 .apk）
 
-```bash
-sudo apt update
-sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
-npm install
-npm run tauri dev
-```
+Linux 默认仅发布 .deb，避免将约 80MB 的 AppImage 误认为轻量版。Windows 使用系统 WebView2。Android 使用系统 WebView。各平台安装包大小以构建产物为准。
 
-构建 .deb 和 AppImage：
+## Android 特别说明
 
-```bash
-npm run tauri build -- --bundles deb,appimage
-```
+Android 标准对话框不支持文件夹递归选择，首版仅支持系统多文件选择。
 
-也可以在 GitHub Actions 的 **Desktop Build** 工作流下载编译产物。
+Android 系统选中文档通常返回 content:// URI。程序尝试通过 Tauri 文件系统插件读取选中文件，把内容送至 Rust 引擎分析。某些第三方文档提供方无法正确读取时，结果明确标为“未检查”。单文件限制 24MB，避免 JS-Rust 桥接内存压力。
 
-## 当前边界
+如 URI 不携带扩展名，尝试从 PDF 或 Office ZIP 内部结构识别格式。Android CSV 保存依赖提供方兼容性，失败时尝试复制 CSV 文本到剪贴板。
 
-- 当前按原始字符串、区分大小写精确匹配；逐文件进行规则检查。
-- 命中结果每文件最多记录 3000 项；超出部分目前截断。扫描状态不代表文档所有排版元素都可完整解析。
-- DOCX 只提取主文档和常见页眉页脚；PPTX 从幻灯片 XML 提取文本；复杂嵌入对象、批注、隐藏内容、图片、加密文档不保证覆盖。
-- UTF-8 以外的文本编码暂未自动检测。PDF 复杂排版可能影响提取顺序。
-- 预览为提取后的文本上下文，不是原生版式预览。
-- 历史任务只记录摘要，不保存完整扫描结果。取消操作在文件边界响应。
-- 不需要网络 API，也不引入 AI 服务；在线字体仅是可选的显示字体，会回退到系统字体。
+Android APK 属于预览构建，不是商店签名正式发行版。即使 CI 编译成功，也需在真实手机上验证 Android 文件访问与保存功能。
 
-## 版本规划
+## 本地构建
 
-- v0.1: 可运行桌面基础版，规则方案、文档/代码搜索、结果导出。
-- v0.2: 高效索引与增量扫描、更完善的报告与精确高亮、代码范围规则。
-- v0.3: 可选 OCR、压缩包扫描、扩展格式支持。
+需要 Node.js 22+、Rust stable，Ubuntu 还需 WebKitGTK 4.1 与 GTK 相关开发依赖。
 
-由 GPT-6 辅助开发。欢迎通过 Issues 报告问题或提出改进。
+- 开发：npm install；npm run tauri dev
+- Ubuntu：npm run tauri build -- --bundles deb
+- Windows：npm run tauri build -- --bundles nsis
+- Android：npm run tauri android init -- --ci；npm run tauri android build -- --apk --debug --ci
+
+## 当前限制
+
+关键词检查仍是区分大小写的文字匹配；OCR、复杂正则、语义检索、索引缓存未实现。复杂 PDF、Office 隐藏对象及扫描件可能无法完整提取。检查失败、提取失败应显示为“未检查”而非“通过”。
+
+源码采用 Tauri 2 + Svelte + Rust，项目由 GPT-6 辅助开发。

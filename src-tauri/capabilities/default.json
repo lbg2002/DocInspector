@@ -1,11 +1,14 @@
 {
   "identifier": "default",
-  "description": "Desktop app permissions",
+  "description": "Local document access",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
-    "dialog:default"
+    "dialog:default",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-text-file"
   ]
 }

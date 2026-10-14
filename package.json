@@ -1,7 +1,7 @@
 {
   "name": "docinspector",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "lucide-svelte": "^0.468.0",
-    "svelte": "^5.0.0"
+    "svelte": "^5.0.0",
+    "@tauri-apps/plugin-fs": "^2.0.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
