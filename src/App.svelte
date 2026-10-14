@@ -5,17 +5,18 @@
  import { open, save } from '@tauri-apps/plugin-dialog';
  import { readFile, writeTextFile } from '@tauri-apps/plugin-fs';
  import { FolderOpen, Files, Plus, Search, Settings2, ShieldCheck, Pencil, Trash2, Copy, ArrowLeft, Play, X, Check, FileText, ChevronRight, Download, RotateCcw, PanelLeftClose, PanelLeftOpen, Clock3, FileWarning, CircleCheck, Ellipsis, ClipboardCopy, Upload, ListFilter } from 'lucide-svelte';
- import type { Profile, Rule, Kind, ScanProgress, ScanReport, FileResult } from './lib/types';
+ import type { Profile, Rule, Kind, ScanOptions, ScanProgress, ScanReport, FileResult } from './lib/types';
 
  type Page = 'home' | 'editor' | 'results' | 'settings';
  interface HistoryMeta {
   id:string; profileId:string; profileName:string; timestamp:number;
   sources:string[]; total:number; scanned:number; issues:number; unreadable:number;
-  cancelled:boolean; truncated:boolean;
+  cancelled:boolean; truncated:boolean; durationMs?:number;
  }
 
  const mobile = /Android/i.test(navigator.userAgent);
  const STORAGE = 'docinspector_profiles_v1';
+ const DEFAULT_OPTIONS:ScanOptions={caseSensitive:true,wholeWord:false,skipCommonDirs:true,excludeDirs:[]};
  const ACTIVE = 'docinspector_active_v2';
  const id = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
  const template = ():Profile => ({
@@ -46,11 +47,21 @@
  let newWord = $state('');
  let newKind:Kind = $state('forbidden');
  let importText = $state('');
+ let resultQuery = $state('');
+ let splitPercent = $state(35);
+ let contextMenu:{path:string;x:number;y:number}|null = $state(null);
 
  const profile:Profile|undefined = $derived(profiles.find(p=>p.id===active));
+ const options:ScanOptions = $derived({...DEFAULT_OPTIONS,...profile?.options});
  const profileHistory = $derived(history.filter(h=>h.profileId===active));
- const filtered:FileResult[] = $derived(result?.files.filter(f=>tab==='all'||f.status===tab)??[]);
- const chosen:FileResult|undefined = $derived(result?.files.find(f=>f.path===selected));
+ const filtered:FileResult[] = $derived(result?.files.filter(f=>{
+  if(tab!=='all' && f.status!==tab)return false;
+  const q=resultQuery.trim().toLocaleLowerCase();
+  return !q || f.path.toLocaleLowerCase().includes(q)
+   || f.hits.some(h=>h.word.toLocaleLowerCase().includes(q) || h.context.toLocaleLowerCase().includes(q))
+   || f.missing.some(w=>w.toLocaleLowerCase().includes(q));
+ })??[]);
+ const chosen:FileResult|undefined = $derived(filtered.find(f=>f.path===selected)??filtered[0]);
  const issues = $derived(result?.files.filter(f=>f.status==='issue').length??0);
  const unreadable = $derived(result?.files.filter(f=>f.status==='unreadable').length??0);
  const passed = $derived(result?.files.filter(f=>f.status==='passed').length??0);
@@ -78,6 +89,7 @@
   active=localStorage.getItem(ACTIVE)||profiles[0]?.id||'';
   if(!profiles.some(p=>p.id===active))active=profiles[0]?.id||'';
   saveProfiles();
+  try {const saved=Number(localStorage.getItem('docinspector_split_v1')); if(saved>=22&&saved<=65)splitPercent=saved;}catch{}
   void loadHistory();
   const dispose=listen<ScanProgress>('scan-progress',e=>{progress=e.payload;});
   return ()=>{void dispose.then(off=>off());};
@@ -88,6 +100,38 @@
   active=pid;
   page='home';
   saveProfiles();
+ }
+ function updateOptions(patch:Partial<ScanOptions>){
+  if(!profile)return;
+  profiles=profiles.map(p=>p.id===active?{...p,options:{...DEFAULT_OPTIONS,...p.options,...patch}}:p);
+  saveProfiles();
+ }
+ function onSplitterDown(e:PointerEvent){
+  if(e.button!==0 || mobile)return;
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  e.preventDefault();
+ }
+ function onSplitterMove(e:PointerEvent){
+  if(!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId))return;
+  const parent=(e.currentTarget as HTMLElement).parentElement;
+  if(!parent)return;
+  const bounds=parent.getBoundingClientRect();
+  splitPercent=Math.max(22,Math.min(65,Math.round((e.clientX-bounds.left)/bounds.width*100)));
+ }
+ function onSplitterUp(e:PointerEvent){
+  const el=e.currentTarget as HTMLElement;
+  if(el.hasPointerCapture(e.pointerId))el.releasePointerCapture(e.pointerId);
+  localStorage.setItem('docinspector_split_v1',String(splitPercent));
+ }
+ async function openDocument(path:string,reveal:boolean){
+  if(mobile){notice='手机端暂不支持打开系统文件';return;}
+  try {await invoke('open_document',{path,reveal});}
+  catch(e){notice='打开失败：'+String(e);}
+ }
+ function openContext(e:MouseEvent,path:string){
+  if(mobile)return;
+  e.preventDefault();
+  contextMenu={path,x:Math.min(e.clientX,window.innerWidth-200),y:Math.min(e.clientY,window.innerHeight-125)};
  }
  function createProfile() {
   if(busy)return;
@@ -173,11 +217,13 @@
   if(!profile){notice='请先选择或创建一个方案';return;}
   if(!sources.length){notice='请先选择文件或文件夹';return;}
   const rules=[...profile.rules.filter(r=>r.enabled),...simpleRules()];
+  const scanOptions:ScanOptions={...DEFAULT_OPTIONS,...profile.options};
   if(!rules.some(r=>r.word.trim())){notice='请添加检查关键词';return;}
   const scanProfile={id:profile.id,name:profile.name};
   const scanSources=[...sources];
   busy=true;cancelling=false;cancelledMobile=false;
-  result=null;openedHistoryId='';selected='';progress=null;tab='all';page='results';notice='';
+  result=null;openedHistoryId='';selected='';progress=null;tab='all';resultQuery='';page='results';notice='';
+  const started=Date.now();
   try {
    let completed:ScanReport;
    if(mobile) {
@@ -189,16 +235,16 @@
       name=decodeURIComponent(uri.split('/').pop()||'选中文件');
       const bytes=await readFile(uri);
       if(bytes.length>24*1024*1024)throw Error('文件超过 24 MB');
-      const scanned=await invoke<FileResult>('scan_bytes',{name,bytes:Array.from(bytes),rules});
+      const scanned=await invoke<FileResult>('scan_bytes',{name,bytes:Array.from(bytes),rules,options:scanOptions});
       files.push({...scanned,path:name});
      }catch(e){
       files.push({path:name,status:'unreadable',hits:[],missing:[],error:String(e)});
      }
      progress={scanned:files.length,total:scanSources.length,current:name};
     }
-    completed={files,total:scanSources.length,scanned:files.length,cancelled:cancelledMobile};
+    completed={files,total:scanSources.length,scanned:files.length,cancelled:cancelledMobile,durationMs:Date.now()-started};
    } else {
-    completed=await invoke<ScanReport>('scan_paths',{paths:scanSources,rules});
+    completed=await invoke<ScanReport>('scan_paths',{paths:scanSources,rules,options:scanOptions});
    }
    result=completed;
    selected=completed.files[0]?.path||'';
@@ -227,7 +273,7 @@
    sources=[...entry.sources];
    result=old;openedHistoryId=entry.id;
    selected=old.files[0]?.path||'';
-   tab='all';progress=null;page='results';
+   tab='all';resultQuery='';progress=null;page='results';
   }catch(e){notice='无法打开记录：'+String(e);}
  }
  async function deleteHistory(entry:HistoryMeta) {
@@ -365,6 +411,17 @@
        <div class="search-input"><Search size={17}/><input bind:value={keyword} placeholder="临时添加检索词（可选，以逗号分隔）"/></div>
        <button class="primary" onclick={startScan}><Play size={15} fill="currentColor"/> 开始扫描</button>
       </div>
+      <details class="scan-advanced">
+       <summary>扫描选项</summary>
+       <div class="scan-option-grid">
+        <label><input type="checkbox" checked={options.caseSensitive} onchange={e=>updateOptions({caseSensitive:e.currentTarget.checked})}/> 区分大小写</label>
+        <label><input type="checkbox" checked={options.wholeWord} onchange={e=>updateOptions({wholeWord:e.currentTarget.checked})}/> 完整单词匹配</label>
+        {#if !mobile}
+         <label><input type="checkbox" checked={options.skipCommonDirs} onchange={e=>updateOptions({skipCommonDirs:e.currentTarget.checked})}/> 跳过代码缓存目录</label>
+         <label class="exclude-input">排除目录 <input type="text" value={options.excludeDirs.join(', ')} placeholder="目录名，逗号分隔" onchange={e=>updateOptions({excludeDirs:[...new Set(e.currentTarget.value.split(/[,，;；\n]+/).map(v=>v.trim()).filter(Boolean))]})}/></label>
+        {/if}
+       </div>
+      </details>
      </section>
      <section class="history-section">
       <div class="section-head"><h2>扫描历史</h2><span class="section-count">{profileHistory.length}</span></div>
@@ -376,7 +433,7 @@
            <span class="history-symbol"><Clock3 size={18}/></span>
            <span class="history-main">
             <strong>{entry.sources.length===1?title(entry.sources[0]):entry.sources.length+' 个来源'}</strong>
-            <span class="history-time">{formatTime(entry.timestamp)} · {entry.scanned} 个文件{entry.cancelled?' · 已取消':''}</span>
+            <span class="history-time">{formatTime(entry.timestamp)} · {entry.scanned} 个文件{entry.durationMs!=null?' · '+(entry.durationMs/1000).toFixed(1)+'s':''}{entry.cancelled?' · 已取消':''}</span>
            </span>
            <span class="history-stats">
             {#if entry.issues}<span class="history-issue">{entry.issues} 个问题文件</span>{/if}
@@ -471,19 +528,21 @@
        <button class:active={tab===t.key} onclick={()=>{tab=t.key as typeof tab;}}>{t.name}</button>
       {/each}
      </div>
-     <div class="result-columns">
+     <div class="result-search"><Search size={17}/><input value={resultQuery} placeholder="筛选文件名、关键词或上下文" oninput={e=>resultQuery=e.currentTarget.value}/>{#if resultQuery}<button class="icon" title="清空筛选" onclick={()=>resultQuery=''}><X size={16}/></button>{/if}</div>
+     <div class="result-columns" style:--list-width={splitPercent+'%'}>
       <div class="file-results">
        {#each filtered as f,i}
-        <button class:active={selected===f.path} class="file-result" onclick={()=>selected=f.path}>
+        <button class:active={chosen?.path===f.path} class="file-result" onclick={()=>selected=f.path} ondblclick={()=>openDocument(f.path,false)} oncontextmenu={e=>openContext(e,f.path)}>
          <FileText size={18}/>
          <span class="truncate"><strong>{title(f.path)}</strong><small title={f.path}>{f.path}</small></span>
          <span class="status" class:issue={f.status==='issue'} class:unreadable={f.status==='unreadable'}>{statusName(f.status)}</span>
         </button>
        {:else}<div class="empty-small">没有符合筛选的文件</div>{/each}
       </div>
+      <div class="split-handle" role="separator" aria-label="调整结果列表宽度" aria-orientation="vertical" tabindex="0" onpointerdown={onSplitterDown} onpointermove={onSplitterMove} onpointerup={onSplitterUp} onpointercancel={onSplitterUp} onkeydown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){splitPercent=Math.max(22,Math.min(65,splitPercent+(e.key==='ArrowRight'?2:-2)));localStorage.setItem('docinspector_split_v1',String(splitPercent));}}}><span></span></div>
       <div class="detail">
        {#if chosen}
-        <div class="detail-head"><h2>{title(chosen.path)}</h2><p>{chosen.path} <button class="icon" title="复制路径" onclick={()=>copyPath(chosen!.path)}><ClipboardCopy size={14}/></button></p></div>
+        <div class="detail-head"><h2>{title(chosen.path)}</h2><p>{chosen.path} <button class="icon" title="复制路径" onclick={()=>copyPath(chosen!.path)}><ClipboardCopy size={14}/></button></p>{#if !mobile}<div class="file-actions"><button class="outline" onclick={()=>openDocument(chosen!.path,false)}>打开文件</button><button class="outline" onclick={()=>openDocument(chosen!.path,true)}>打开所在目录</button></div>{/if}</div>
         {#if chosen.error}<div class="alert">{chosen.error}</div>{/if}
         {#each chosen.missing as word}
          <div class="hit missing"><span><FileWarning size={16}/> 必须包含 · {word}</span><small>未找到</small></div>
@@ -491,7 +550,7 @@
         {#each chosen.hits as hit}
          <div class="hit">
           <div class="hit-label" class:danger={hit.kind==='forbidden'}>{kindName(hit.kind)} · {hit.word}<small>{hit.location}</small></div>
-          <p>{#if hit.context.includes(hit.word)}{hit.context.slice(0,hit.context.indexOf(hit.word))}<mark>{hit.word}</mark>{hit.context.slice(hit.context.indexOf(hit.word)+hit.word.length)}{:else}{hit.context}{/if}</p>
+          <p>{#if hit.context.includes(hit.matched||hit.word)}{hit.context.slice(0,hit.context.indexOf(hit.matched||hit.word))}<mark>{hit.matched||hit.word}</mark>{hit.context.slice(hit.context.indexOf(hit.matched||hit.word)+(hit.matched||hit.word).length)}{:else}{hit.context}{/if}</p>
          </div>
         {/each}
         {#if !chosen.error&&!chosen.missing.length&&!chosen.hits.length}
@@ -514,6 +573,14 @@
     <button class="outline" onclick={importProfiles}><Upload size={16}/> 导入方案</button>
     <div class="section-head settings-section"><h2>文档支持</h2></div>
     <p>PDF、DOCX、PPTX、XLSX、XLS、ODS、TXT、MD、CSV、LOG，以及 Python、Rust、JavaScript、TypeScript、C/C++、Java、Shell 等代码。扫描件 OCR 暂不支持。</p>
+   </div>
+  {/if}
+  {#if contextMenu}
+   <div class="context-backdrop" role="presentation" onclick={()=>contextMenu=null}></div>
+   <div class="file-context-menu" style:left={contextMenu.x+'px'} style:top={contextMenu.y+'px'}>
+    <button onclick={()=>{const p=contextMenu!.path;contextMenu=null;void openDocument(p,false);}}>打开文件</button>
+    <button onclick={()=>{const p=contextMenu!.path;contextMenu=null;void openDocument(p,true);}}>打开所在目录</button>
+    <button onclick={()=>{const p=contextMenu!.path;contextMenu=null;copyPath(p);}}>复制路径</button>
    </div>
   {/if}
   {#if notice}

@@ -1,47 +1,45 @@
-# DocInspector v0.3
+# DocInspector v0.3.1
 
-面向 Ubuntu / Windows / Android（预览）的本地文档与源代码关键词检索及规则检查器，采用 Rust + Tauri 2 + Svelte。
+轻量离线文档与代码关键词检索工具。支持 Ubuntu、Windows，Android 为预览版。Rust 搜索核心、Tauri 2 + Svelte 界面。
 
 ## 操作
 
-1. 左侧只显示检查方案列表，点击选择当前方案。
-2. 右侧顶部可选文件夹、多个文件，临时补充检索关键词并开始扫描。
-3. 右侧下部显示当前方案扫描历史，点击历史记录可重新查看文件状态、命中位置和上下文。
-4. 右上角提供编辑、复制、删除方案；编辑页可直接修改关键词、规则类型、启用状态，支持批量添加。
-5. 结果按全部、问题、通过、未检查筛选，可导出 CSV。
+左侧选择检查方案，右侧选择文件夹或文件，扫描并在历史记录中重新查看结果。右上角可编辑、复制、删除方案，原文件始终只读。
 
-方案保存在本机应用 WebView 存储中，扫描历史保存在系统应用数据目录。历史记录最多 30 条，每文件历史证据最多 60 条，超大记录可能进一步裁剪证据，但仍保留文件状态。完整留档应导出 CSV。
+“扫描选项”默认折叠，可按方案设置：
+- 区分大小写：默认开启。关闭时忽略 ASCII 英文大小写，尚未实现完整 Unicode 大小写折叠。
+- 完整单词匹配：默认关闭。Unicode 字母、数字和下划线用于判断单词边界。
+- 跳过代码缓存目录：默认开启，自动排除 .git、node_modules、target、.venv、venv、__pycache__、dist、build、.cache 等文件夹。
+- 自定义排除目录：按目录名填写，逗号分隔。
 
-旧版最近任务只保存名称和数量，不包含实际扫描结果，无法恢复为可点击的详细记录。新版产生的扫描会记录可查看的结果。
+## v0.3.1 更新
 
-删除方案不会自动删除历史文件，但对应历史不再显示于其他方案下；扫描历史可以单独删除。
-
-## 安装
-
-GitHub Actions 的 Desktop Build 中提供 Ubuntu amd64 的 DocInspector-Ubuntu-DEB 和 Windows x64 的 DocInspector-Windows-Installer。下载、解压后安装。Linux 不再发布体积较大的 AppImage。
-
-Ubuntu 使用系统 WebKitGTK，Windows 使用 WebView2。各系统安装包大小以实际构建产物为准。
+- 使用 Rust Aho–Corasick 单次匹配多关键词，包括重叠词。
+- 最多 4 个工作线程并行扫描，支持取消。
+- 支持文本和代码跨行关键词匹配，保留起始行号。
+- 结果搜索文件名、路径、关键词、上下文和缺失关键词。
+- 结果分栏可拖动并保存宽度，文件列表支持双击打开、右键操作。
+- 扫描历史显示用时。
+- 新增 Rust 关键词准确性、跨行、命中数量上限与性能冒烟测试，并加入 GitHub Actions。
+- Ubuntu 继续仅发布小体积 deb，不发布大型 AppImage。
 
 ## 文件格式
 
-支持 PDF、DOCX、PPTX、XLS、XLSX、ODS、TXT、MD、CSV、LOG、JSON、YAML、TOML，以及 .py / .rs / .js / .ts / .cpp / .h / .java / .go / .sql / .sh 等代码文件。代码按行、文字型 PDF 按页、Excel 按工作表单元格提供位置。
+支持 PDF、DOCX、PPTX、XLS/XLSX/ODS、TXT、MD、CSV、LOG、JSON、TOML、YAML，以及 Python、Rust、JS/TS、C/C++、Go、Java、SQL、Shell、TeX 等代码文件。复杂 Office 嵌入对象、扫描版 PDF 不保证完全读取，暂不支持 OCR。
 
-OCR、复杂 Word/PPT 嵌入对象及语义检索尚未支持，无法读取或解析的文件显示“未检查”。
+## 下载
 
-## Android 预览
-
-Android 使用单列布局与系统多文件选择，不支持标准文件对话框的目录递归。部分 content:// 提供方访问仍需要真机验证。预览 APK 位于 Android APK (Preview) 工作流。
+在 https://github.com/lbg2002/DocInspector/actions 找最新成功的 Desktop Build：
+- Ubuntu：DocInspector-Ubuntu-DEB，可解压 deb 并安装。
+- Windows：DocInspector-Windows-Installer，解压 NSIS exe 安装器。
+Android：Android APK (Preview) 调试预览，暂不支持目录递归，部分文件提供方访问需要真机验证。
 
 ## 开发
 
-依赖 Node.js 22+、Rust stable、Tauri 2 对应平台工具链。
+需要 Node.js 22+、Rust stable、Tauri 2 对应系统依赖。
+- npm install
+- npm run tauri dev
+- cargo test --manifest-path src-tauri/Cargo.toml --lib
+- npm run tauri build -- --bundles deb
 
-本地启动：npm install；npm run tauri dev
-
-Ubuntu 打包：npm run tauri build -- --bundles deb
-
-Windows 打包：npm run tauri build -- --bundles nsis
-
-GitHub Actions: https://github.com/lbg2002/DocInspector/actions
-
-由 GPT-6 协助开发。
+配置保存在本地，历史证据有数量限制，完整归档请在当次扫描后导出 CSV。由 GPT-6 协助开发。

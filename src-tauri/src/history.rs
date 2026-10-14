@@ -21,6 +21,8 @@ pub struct HistoryMeta {
  pub unreadable:usize,
  pub cancelled:bool,
  pub truncated:bool,
+ #[serde(default)]
+ pub duration_ms:u64,
 }
 
 #[derive(Serialize,Deserialize)]
@@ -98,7 +100,7 @@ pub fn save_scan_history(
  }
  let mut meta=HistoryMeta{id,profile_id,profile_name,timestamp:(now/1000) as u64,
    sources,total:stored.total,scanned:stored.scanned,issues,unreadable,
-   cancelled:stored.cancelled,truncated};
+   cancelled:stored.cancelled,truncated,duration_ms:stored.duration_ms};
  let mut bytes=serde_json::to_vec(&StoredReport{meta:meta.clone(),report:stored.clone()}).map_err(|e|e.to_string())?;
  if bytes.len()>MAX_HISTORY_BYTES {
   meta.truncated=true;
