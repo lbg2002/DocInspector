@@ -91,7 +91,7 @@
   saveProfiles();
   try {const saved=Number(localStorage.getItem('docinspector_split_v1')); if(saved>=22&&saved<=65)splitPercent=saved;}catch{}
   void loadHistory();
-  const dispose=listen<ScanProgress>('scan-progress',e=>{progress=e.payload;});
+  const dispose=listen<ScanProgress>('scan-progress',e=>{if(!progress || e.payload.scanned>=progress.scanned)progress=e.payload;});
   return ()=>{void dispose.then(off=>off());};
  });
 

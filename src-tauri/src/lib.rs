@@ -247,3 +247,27 @@ pub fn run(){
   history::list_scan_history,history::load_scan_history,history::save_scan_history,history::delete_scan_history])
  .run(tauri::generate_context!()).expect("DocInspector startup failed");
 }
+
+#[cfg(test)]
+mod scan_directory_tests {
+ use super::*;
+ #[test]
+ fn exclusions_skip_cache_and_custom_dirs_but_not_regular_code() {
+  let root=tempfile::tempdir().unwrap();
+  for name in [".git","node_modules","private","src"] {
+   std::fs::create_dir_all(root.path().join(name)).unwrap();
+   std::fs::write(root.path().join(name).join("test.rs"),"fn main() {}").unwrap();
+  }
+  let roots=vec![root.path().to_string_lossy().into_owned()];
+  let mut opts=ScanOptions::default();
+  let initial=collect(&roots,&opts);
+  assert_eq!(initial.len(),2);
+  opts.exclude_dirs.push("private".into());
+  let excluded=collect(&roots,&opts);
+  assert_eq!(excluded.len(),1);
+  assert!(excluded[0].ends_with(std::path::Path::new("src/test.rs")));
+  opts.skip_common_dirs=false;
+  let unignored=collect(&roots,&opts);
+  assert_eq!(unignored.len(),3);
+ }
+}
