@@ -1,6 +1,6 @@
 [package]
 name = "docinspector"
-version = "0.3.1"
+version = "0.3.2"
 description = "Local document inspector"
 authors = ["DocInspector contributors"]
 edition = "2021"
@@ -28,3 +28,4 @@ pdf-extract = "0.10"
 zip = "2"
 quick-xml = "0.37"
 csv = "1"
+encoding_rs = "0.8"
