@@ -9,7 +9,7 @@
   ArrowLeft, Play, X, Check, FileText, ChevronRight, Download, RotateCcw,
   PanelLeftClose, PanelLeftOpen, Clock3, FileWarning, CircleCheck, ClipboardCopy,
   Upload, ListFilter, Sun, Moon, Sparkles, SlidersHorizontal, ExternalLink,
-  ArrowUpDown, Layers
+  ArrowUpDown, Layers, RefreshCw
  } from 'lucide-svelte';
  import type { Profile, Rule, Kind, ScanOptions, ScanProgress, ScanReport, FileResult, Hit } from './lib/types';
 
@@ -181,6 +181,49 @@
 
  // Settings / import state
  let importText = $state('');
+ interface UpdateInfo {
+  available: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  notes: string;
+  releaseUrl: string;
+ }
+ let updateInfo: UpdateInfo | null = $state(null);
+ let updateBusy = $state(false);
+ let installingUpdate = $state(false);
+ let updateProgress = $state(0);
+ let updateError = $state('');
+ const appVersion = '0.3.3';
+
+ async function checkUpdates() {
+  if (mobile || updateBusy || installingUpdate) return;
+  updateBusy = true;
+  updateError = '';
+  updateInfo = null;
+  try {
+   updateInfo = await invoke<UpdateInfo>('check_for_update');
+  } catch (error) {
+   updateError = '检查更新失败：' + String(error);
+  } finally {
+   updateBusy = false;
+  }
+ }
+
+ async function installAvailableUpdate() {
+  if (!updateInfo?.available || installingUpdate || busy) return;
+  installingUpdate = true;
+  updateProgress = 0;
+  updateError = '';
+  try {
+   const result = await invoke<string>('install_update');
+   showNotice(result);
+   updateInfo = null;
+  } catch (error) {
+   updateError = '更新安装失败：' + String(error);
+  } finally {
+   installingUpdate = false;
+  }
+ }
 
  // Results workbench state
  let resultQuery = $state('');
@@ -380,10 +423,17 @@
 
   void loadHistory();
 
+  let unlistenUpdate: (() => void) | undefined;
   let unlistenProgress: (() => void) | undefined;
   let unlistenDrop: (() => void) | undefined;
   let unlistenDragEnter: (() => void) | undefined;
   let unlistenDragLeave: (() => void) | undefined;
+
+  listen<{ downloaded: number; total: number }>('updater-progress', e => {
+   updateProgress = e.payload.total > 0
+    ? Math.min(100, Math.round(e.payload.downloaded / e.payload.total * 100))
+    : 0;
+  }).then(off => { unlistenUpdate = off; }).catch(() => {});
 
   listen<ScanProgress>('scan-progress', e => {
    if (!progress || e.payload.scanned >= progress.scanned) progress = e.payload;
@@ -424,6 +474,7 @@
    .catch(() => {});
 
   return () => {
+   unlistenUpdate?.();
    unlistenProgress?.();
    unlistenDrop?.();
    unlistenDragEnter?.();
@@ -2211,6 +2262,45 @@
        </button>
       </div>
      </div>
+    </section>
+
+    <section class="panel-card" aria-label="关于与软件更新">
+     <div class="section-head">
+      <h2>关于 DocInspector</h2>
+     </div>
+     <div class="settings-row">
+      <div>
+       <strong>DocInspector · v{appVersion}</strong>
+       <p class="row-sub">轻量化本地文档及代码关键词检查器</p>
+      </div>
+      <button class="outline" onclick={checkUpdates} disabled={mobile || updateBusy || installingUpdate}>
+       <RefreshCw size={15} /> {updateBusy ? '正在检查…' : '检查更新'}
+      </button>
+     </div>
+     {#if mobile}
+      <p class="row-sub" role="status">Android 预览版暂不支持应用内更新，请通过 GitHub Actions 获取新 APK。</p>
+     {:else if updateError}
+      <p class="update-error" role="alert">{updateError}</p>
+     {:else if updateInfo?.available}
+      <div class="update-detail" role="status">
+       <strong>发现新版本 v{updateInfo.latestVersion}</strong>
+       <p class="row-sub">当前 v{updateInfo.currentVersion} · 发布说明与安装包来自官方 GitHub Releases</p>
+       {#if updateInfo.notes}
+        <details><summary>查看更新说明</summary><p class="update-notes">{updateInfo.notes}</p></details>
+       {/if}
+       <div class="update-actions">
+        <button class="primary" onclick={installAvailableUpdate} disabled={installingUpdate || busy}>
+         <Download size={15} />
+         {installingUpdate ? `下载并安装中 ${updateProgress}%…` : '下载并安装更新'}
+        </button>
+        <a href={updateInfo.releaseUrl} target="_blank" rel="noopener noreferrer">查看发布页面 <ExternalLink size={13} /></a>
+       </div>
+       {#if installingUpdate}<progress max="100" value={updateProgress} aria-label="更新下载进度"></progress>{/if}
+       <p class="row-sub">安装时可能需要系统授权。开始安装前请保存当前工作；不会上传扫描文件。</p>
+      </div>
+     {:else if updateInfo}
+      <p class="row-sub" role="status">已是最新版本（v{updateInfo.currentVersion}）。</p>
+     {/if}
     </section>
 
     <section class="panel-card">
