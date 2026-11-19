@@ -1,6 +1,8 @@
 #[cfg(not(standalone_test))]
 mod history;
 mod matcher;
+#[cfg(not(standalone_test))]
+mod updater;
 use matcher::{Matcher, ScanOptions};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -702,6 +704,8 @@ pub fn run() {
             export_csv,
             export_csv_text,
             open_document,
+            updater::check_for_update,
+            updater::install_update,
             history::list_scan_history,
             history::load_scan_history,
             history::save_scan_history,

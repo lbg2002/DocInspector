@@ -50,6 +50,18 @@
 
 > Ubuntu 版使用系统 WebKitGTK，**不额外打包约 80 MB 的 AppImage**。不同系统安装包体积会有所不同。
 
+### 🔄 检查更新
+
+在 **设置与迁移 → 关于 DocInspector → 检查更新** 中手动查询 GitHub 最新正式版。检测到新版本后，点击 **下载并安装更新**，会在应用内下载对应的 Ubuntu `.deb` 或 Windows `.exe`，校验 GitHub Release 资产 SHA-256 摘要，然后启动系统安装流程。
+
+- Ubuntu 使用 `pkexec /usr/bin/dpkg -i`，系统会要求授权；安装成功后关闭应用并重新启动即可使用新版。部分系统没有配置 polkit，需手动安装已经下载并验证的包。
+- Windows 会自动启动 NSIS 安装向导并退出当前应用；请在向导中确认安装。
+- 只接受本仓库的稳定 Release、固定文件名和 SHA-256 摘要，**不会自动执行未知下载源**。请在更新前保存工作。
+- Android 仍为独立调试版，不支持此桌面安装更新能力。
+- 安装包由 [GitHub Actions](https://github.com/lbg2002/DocInspector/actions/workflows/build.yml) 在每次 main 更新后构建；新版本须同步更新三个版本号并新增 `docs/RELEASE_NOTES_vX.Y.Z.md`，发布流程才会创建新 Release。无额外服务器；目前发布包未经代码签名，因此仍应确认 Release 来源可信。
+
+首次部署更新功能需先安装包含更新入口的 `v0.3.3` 或更新版本。
+
 ## 🧩 自定义方案
 
 最常用的操作是创建并保存一套规则。比如一份论文交付前的检查方案：
