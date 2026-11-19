@@ -29,3 +29,6 @@ zip = "2"
 quick-xml = "0.37"
 csv = "1"
 encoding_rs = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+semver = "1"
+sha2 = "0.10"
