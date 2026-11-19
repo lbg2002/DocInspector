@@ -52,9 +52,9 @@ mod desktop {
     use serde::Deserialize;
     use sha2::{Digest, Sha256};
     use std::{
-        fs::{self, OpenOptions},
+        fs::{self},
         io::Write,
-        path::{Path, PathBuf},
+        path::PathBuf,
         time::Duration,
     };
     use tauri::{Emitter, Manager};
@@ -307,7 +307,7 @@ mod desktop {
 
     #[cfg(target_os = "linux")]
     async fn launch_installer(path: PathBuf) -> Result<String, String> {
-        if !Path::new("/usr/bin/pkexec").is_file() || !Path::new("/usr/bin/dpkg").is_file() {
+        if !std::path::Path::new("/usr/bin/pkexec").is_file() || !std::path::Path::new("/usr/bin/dpkg").is_file() {
             return Err(format!(
                 "系统缺少 pkexec 或 dpkg。已校验安装包保存在 {}，可手动安装",
                 path.display()
